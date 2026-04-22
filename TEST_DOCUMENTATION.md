@@ -12,10 +12,15 @@ The Stamdata API operates **asynchronously** for large data requests. This means
 
 1.  **API Key**: You must have a valid API key from Stamdata.
 2.  **APIKey.txt**: The script expects a file named `APIKey.txt` in the same directory containing only your API key string.
-3.  **Dependencies**: The script requires the `requests` library. Install it via:
-    ```bash
-    pip install requests
-    ```
+3.  **Virtual Environment**: It is highly recommended to use the provided virtual environment.
+
+### Environment Setup
+The environment has been initialized with the necessary dependencies:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install requests pandas openpyxl
+```
 
 ## Execution Workflow
 
@@ -37,11 +42,19 @@ The script follows a three-step lifecycle to retrieve data:
 *   The script fetches the final JSON dataset from the first available `FeedURL`.
 *   The final response includes metadata (data methodology, units) and the actual ESG metrics for each ISIN.
 
+## High-Level Functionality
+
+The `StamdataAPIClient` now includes convenience methods:
+*   `get_company_data(isin, years)`: This method orchestrates the entire asynchronous workflow in a single call. It returns a flat list of all data records found for the specified company and time period.
+*   `save_to_excel(data, filename)`: Saves the retrieved list of dictionaries into an Excel `.xlsx` file. (Requires `openpyxl`).
+*   `save_to_csv(data, filename)`: Saves the retrieved list of dictionaries into a CSV file.
+
 ## How to Run the Test
 
-Simply execute the script using Python:
+Activate the virtual environment and run the script:
 
 ```bash
+source .venv/bin/activate
 python3 APITest.py
 ```
 

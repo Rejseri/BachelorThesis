@@ -2,6 +2,7 @@ import requests
 import os
 import json
 import time
+import pandas as pd
 from typing import Dict, Any, List, Optional, Union
 
 class StamdataAPIClient:
@@ -91,45 +92,89 @@ class StamdataAPIClient:
         response.raise_for_status()
         return response.json()
 
+    def get_company_data(self, isin: str, years: List[str]) -> List[Dict[str, Any]]:
+        """
+        Convenience method to retrieve all ESG data for a specific company (ISIN) and years.
+        Handles the entire lifecycle: Request -> Poll -> Download -> Parse.
+        """
+        try:
+            # Step 1: Request Data
+            request_id = self.request_esg_pcaf_estimates([isin], years)
+            
+            # Step 2: Poll for completion
+            download_urls = self.poll_for_completion(request_id)
+            
+            # Step 3: Retrieve and aggregate results
+            all_records = []
+            for url in download_urls:
+                dataset = self.download_data(url)
+                records = dataset.get("Data", [])
+                all_records.extend(records)
+                
+            return all_records
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to fetch data for ISIN {isin}: {e}")
+            raise
+
+    def save_to_excel(self, data: List[Dict[str, Any]], filename: str):
+        """Saves the data list to an Excel file using pandas."""
+        if not data:
+            print("[WARN] No data to save.")
+            return
+
+        df = pd.DataFrame(data)
+        try:
+            df.to_excel(filename, index=False)
+            print(f"Data successfully saved to Excel: {filename}")
+        except ModuleNotFoundError:
+            print("[ERROR] 'openpyxl' is not installed. Please install it to export to Excel.")
+            print("Fallback: Saving to CSV instead.")
+            self.save_to_csv(data, filename.replace(".xlsx", ".csv"))
+        except Exception as e:
+            print(f"[ERROR] Failed to save to Excel: {e}")
+
+    def save_to_csv(self, data: List[Dict[str, Any]], filename: str):
+        """Saves the data list to a CSV file using pandas."""
+        if not data:
+            print("[WARN] No data to save.")
+            return
+
+        df = pd.DataFrame(data)
+        try:
+            df.to_csv(filename, index=False)
+            print(f"Data successfully saved to CSV: {filename}")
+        except Exception as e:
+            print(f"[ERROR] Failed to save to CSV: {e}")
+
 def main():
     """Main execution flow for testing the Stamdata ESG API."""
     try:
         # Configuration
-        ISINS_TO_TEST = ["NO0010881246"] # Avinor AS
-        YEARS_TO_TEST = ["2023"]
+        ISIN = "NO0010881246" # Avinor AS
+        YEARS = ["2023", "2022", "2021"]
         
         # Initialize Client
         client = StamdataAPIClient()
 
-        # Step 1: Request Data (Async)
-        request_id = client.request_esg_pcaf_estimates(ISINS_TO_TEST, YEARS_TO_TEST)
-        print(f"Successfully queued request. ID: {request_id}")
-
-        # Step 2: Poll for completion
-        download_urls = client.poll_for_completion(request_id)
-        print(f"Processing complete. {len(download_urls)} file(s) available.")
-
-        # Step 3: Retrieve Results
-        # For this test, we just fetch the first available file
-        final_data = client.download_data(download_urls[0])
+        # Fetch all data for the company in one call
+        print(f"--- Fetching all data for {ISIN} ({', '.join(YEARS)}) ---")
+        all_data = client.get_company_data(ISIN, YEARS)
+        
+        # Save to Excel
+        output_file = f"CompanyData_{ISIN}.xlsx"
+        client.save_to_excel(all_data, output_file)
         
         # Output summary
         print("\n" + "="*50)
-        print("API TEST SUCCESSFUL")
+        print(f"RETRIEVAL SUCCESSFUL: {len(all_data)} records found")
         print("="*50)
         
-        # Display meta info
-        meta = final_data.get("Meta", {})
-        print(f"Generated At: {final_data.get('GeneratedAt')}")
-        print(f"Data Version: {meta.get('DataVersion')}")
-        
-        # Display data count
-        results = final_data.get("Data", [])
-        print(f"Records retrieved: {len(results)}")
-        
-        if results:
-            print("\nSample Record (First Result):")
-            print(json.dumps(results[0], indent=2))
+        if all_data:
+            print("\nSample Data (First Record):")
+            # Filter to show a few key fields if the record is large
+            sample = all_data[0]
+            print(json.dumps(sample, indent=2))
             
     except Exception as e:
         print(f"\n[ERROR] API Test Failed: {e}")
