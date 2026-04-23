@@ -22,6 +22,12 @@ source .venv/bin/activate
 pip install requests pandas openpyxl
 ```
 
+### OMX 10 Data Generation (`Omx10Generator.py`)
+This script focuses on the top 10 companies in the OMX index.
+*   **Targeting**: Specifically identifies the largest companies (by market cap) using their Stamdata Organization Numbers.
+*   **Criteria**: Filters results to ensure each company has at least 2 years of complete reporting data.
+*   **Output**: Generates `Omx10Data.csv` and `Omx10Data.xlsx` containing PCAF estimates for the years 2020-2023.
+
 ## Execution Workflow
 
 The script follows a three-step lifecycle to retrieve data:

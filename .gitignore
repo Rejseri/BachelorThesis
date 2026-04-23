@@ -1,2 +1,15 @@
+# Secrets
 APIKey.txt
 
+# Data files (optional, depending on if you want to track them)
+# data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+
+# Excel/CSV temporary files
+.~lock.*

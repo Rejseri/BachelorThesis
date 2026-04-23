@@ -1,3 +1,4 @@
+
 import requests
 import os
 import json
@@ -130,7 +131,7 @@ class StamdataAPIClient:
         except ModuleNotFoundError:
             print("[ERROR] 'openpyxl' is not installed. Please install it to export to Excel.")
             print("Fallback: Saving to CSV instead.")
-            self.save_to_csv(data, filename.replace(".xlsx", ".csv"))
+            self.save_to_excel(data, filename.replace(".xlsx", ".csv"))
         except Exception as e:
             print(f"[ERROR] Failed to save to Excel: {e}")
 
@@ -162,7 +163,7 @@ def main():
         all_data = client.get_company_data(ISIN, YEARS)
         
         # Save to Excel
-        output_file = f"CompanyData_{ISIN}.xlsx"
+        output_file = f"data/CompanyData_{ISIN}.xlsx"
         client.save_to_excel(all_data, output_file)
         
         # Output summary
