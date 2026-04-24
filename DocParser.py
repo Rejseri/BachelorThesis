@@ -1,83 +1,71 @@
 import os
 import argparse
-import time
 from pathlib import Path
-
-"""
-Ändra till din hårdvara för optimal kod och parallellisering 
-"""
-CPU_CORES = 8
-RAM_GB = 16
-
-# 1. Document Concurrency: How many PDFs to process at once.
-# Docling's AI models (Layout/Tables) use ~3-4GB of RAM per process.
-# 16GB / 4GB = 4 workers. We use 3 to stay safe and leave RAM for the OS.
-DOC_CONCURRENCY = max(1, RAM_GB // 5) 
-
-# 2. Threading: How many CPU threads each worker uses.
-# We distribute our 8 cores across our document workers.
-THREADS_PER_WORKER = max(1, CPU_CORES // DOC_CONCURRENCY)
-# ==========================================
-
-# Apply threading limits to the system environment before importing docling
-os.environ["OMP_NUM_THREADS"] = str(THREADS_PER_WORKER)
-os.environ["MKL_NUM_THREADS"] = str(THREADS_PER_WORKER)
-
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.settings import settings
+from docling.document_converter import DocumentConverter
 
 def parse_pdfs_to_markdown(input_folder: str, output_folder: str):
+    """
+    Parses all PDF files in the input_folder and saves them as Markdown files in the output_folder.
+    """
     input_path = Path(input_folder)
     output_path = Path(output_folder)
+    
+    # Ensure output directory exists
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Configure Docling to use the hardware-based limits
-    pipeline_options = PdfPipelineOptions()
-    # Since these are 60-page reports, we chunk them for parallel page parsing
-    pipeline_options.page_chunk_size = 15 
+    # Initialize DocumentConverter
+    print("Initializing DocumentConverter...")
+    converter = DocumentConverter()
     
-    # Internal performance settings
-    settings.perf.doc_batch_concurrency = DOC_CONCURRENCY
-    
-    converter = DocumentConverter(
-        format_options={
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-        }
-    )
-    
+    # Find all PDF files in the input folder
     pdf_files = list(input_path.glob('*.pdf'))
+    
     if not pdf_files:
         print(f"No PDF files found in {input_folder}")
         return
 
-    print(f"--- Hardware Profile: {CPU_CORES} Cores | {RAM_GB}GB RAM ---")
-    print(f"--- Parallel Strategy: {DOC_CONCURRENCY} Docs at a time | {THREADS_PER_WORKER} Threads each ---")
-    print(f"Processing {len(pdf_files)} files...")
-
-    start_time = time.time()
+    print(f"Found {len(pdf_files)} PDF files. Starting conversion...")
     
-    # convert_all is the fastest way to run docling in a batch
-    results = converter.convert_all(pdf_files, raises_on_error=False)
-    
-    for result in results:
-        if result.document:
-            file_stem = Path(result.input.file).stem
-            output_file = output_path / f"{file_stem}.md"
+    for pdf_file in pdf_files:
+        print(f"Processing: {pdf_file.name}...")
+        try:
+            # Convert document
+            result = converter.convert(str(pdf_file))
+            
+            # Export to Markdown
+            markdown_content = result.document.export_to_markdown()
+            
+            # Define output file path
+            output_file = output_path / f"{pdf_file.stem}.md"
+            
+            # Save Markdown content
             with open(output_file, "w", encoding="utf-8") as f:
-                f.write(result.document.export_to_markdown())
-            print(f"Done: {file_stem}.md")
-        else:
-            print(f"Error processing a file.")
-
-    end_time = time.time()
-    print(f"\nFinished in {round(end_time - start_time, 2)} seconds.")
+                f.write(markdown_content)
+                
+            print(f"Successfully converted and saved to: {output_file}")
+        except Exception as e:
+            print(f"Failed to convert {pdf_file.name}. Error: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_folder", type=str, default="AnnualReports2023")
-    parser.add_argument("--output_folder", type=str, default="ParsedReports2023")
+    # Hyperparameters for the folder paths
+    # You can change these defaults or pass them via command line arguments
+    DEFAULT_INPUT_FOLDER = "AnnualReports2023"
+    DEFAULT_OUTPUT_FOLDER = "ParsedReports2023"
+
+    parser = argparse.ArgumentParser(description="Parse PDF files to Markdown using Docling.")
+    parser.add_argument(
+        "--input_folder", 
+        type=str, 
+        default=DEFAULT_INPUT_FOLDER, 
+        help="Path to the folder containing PDF files."
+    )
+    parser.add_argument(
+        "--output_folder", 
+        type=str, 
+        default=DEFAULT_OUTPUT_FOLDER, 
+        help="Path to the folder where Markdown files will be saved."
+    )
+    
     args = parser.parse_args()
     
     parse_pdfs_to_markdown(args.input_folder, args.output_folder)
