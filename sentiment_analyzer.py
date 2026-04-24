@@ -138,4 +138,7 @@ class SentimentAnalyzer:
 
 
 def build_default_model_path() -> str:
-    return str(Path(__file__).resolve().parent / "models" / "BERT")
+    local_path = Path(__file__).resolve().parent / "models" / "BERT"
+    if local_path.exists():
+        return str(local_path)
+    return "ProsusAI/finbert"
